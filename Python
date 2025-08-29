@@ -1,0 +1,63 @@
+# fpl_dump.py — fetch live FPL data to JSON + CSV
+import argparse, json, os, time
+from typing import List
+import requests, pandas as pd
+
+BASE = "https://fantasy.premierleague.com/api"
+
+def fetch(url, retries=3, timeout=30):
+    for i in range(retries):
+        r = requests.get(url, timeout=timeout)
+        if r.ok: return r.json()
+        time.sleep(2*(i+1))
+    r.raise_for_status()
+
+def save_json(obj, path):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+
+def to_csv(records, path):
+    pd.json_normalize(records).to_csv(path, index=False)
+
+def dump_bootstrap(outdir):
+    bs = fetch(f"{BASE}/bootstrap-static/")
+    save_json(bs, os.path.join(outdir, "bootstrap_static.json"))
+    to_csv(bs.get("elements", []), os.path.join(outdir, "players.csv"))
+    to_csv(bs.get("teams", []), os.path.join(outdir, "teams.csv"))
+    to_csv(bs.get("element_types", []), os.path.join(outdir, "positions.csv"))
+
+def dump_fixtures(outdir):
+    fixtures = fetch(f"{BASE}/fixtures/")
+    save_json(fixtures, os.path.join(outdir, "fixtures.json"))
+    to_csv(fixtures, os.path.join(outdir, "fixtures.csv"))
+
+def dump_gw_live(outdir, gw:int):
+    live = fetch(f"{BASE}/event/{gw}/live/")
+    save_json(live, os.path.join(outdir, f"gw{gw}_live.json"))
+    to_csv(live.get("elements", []), os.path.join(outdir, f"gw{gw}_live_elements.csv"))
+
+def dump_players_summary(outdir, pids:List[int]):
+    for pid in pids:
+        s = fetch(f"{BASE}/element-summary/{pid}/")
+        save_json(s, os.path.join(outdir, f"player_{pid}_summary.json"))
+        if "history" in s: to_csv(s["history"], os.path.join(outdir, f"player_{pid}_history.csv"))
+        if "fixtures" in s: to_csv(s["fixtures"], os.path.join(outdir, f"player_{pid}_fixtures.csv"))
+
+def main():
+    import argparse, os
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default="./data")
+    ap.add_argument("--gw", type=int, default=None)
+    ap.add_argument("--players", default="")
+    a = ap.parse_args()
+
+    os.makedirs(a.out, exist_ok=True)
+    dump_bootstrap(a.out)
+    dump_fixtures(a.out)
+    if a.gw: dump_gw_live(a.out, a.gw)
+    if a.players.strip():
+        dump_players_summary(a.out, [int(x) for x in a.players.split(",") if x.strip()])
+    print("Saved to", a.out)
+
+if __name__ == "__main__":
+    main()
