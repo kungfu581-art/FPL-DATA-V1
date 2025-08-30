@@ -2,9 +2,10 @@ name: FPL Daily Data
 
 on:
   schedule:
+    # GitHub cron is UTC. 12:00 AM IST == 18:30 UTC (previous day), 2:00 PM IST == 08:30 UTC
     - cron: "30 18 * * *"   # 12:00 AM IST daily
     - cron: "30 8 * * *"    # 2:00 PM IST daily
-  workflow_dispatch: {}
+  workflow_dispatch: {}      # allow manual runs from Actions tab
 
 permissions:
   contents: write
@@ -12,6 +13,7 @@ permissions:
 jobs:
   fetch-and-commit:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -19,50 +21,106 @@ jobs:
       - name: Make data folder
         run: mkdir -p data
 
-      - name: Fetch JSON from FPL API (no script needed)
+      - name: Fetch JSON from official FPL API (no external script)
         run: |
           curl -s https://fantasy.premierleague.com/api/bootstrap-static/ -o data/bootstrap_static.json
           curl -s https://fantasy.premierleague.com/api/fixtures/ -o data/fixtures.json
 
-      # OPTIONAL: convert JSON -> CSV right here (stdlib only, no pandas)
-      - name: Convert JSON to CSV
+      - name: Convert JSON → CSV (stdlib only)
         run: |
           python - <<'PY'
           import json, csv, os
 
           os.makedirs("data", exist_ok=True)
 
-          # bootstrap_static -> players.csv, teams.csv, positions.csv
-          with open("data/bootstrap_static.json","r") as f:
+          # --- Read master JSON
+          with open("data/bootstrap_static.json","r",encoding="utf-8") as f:
             bs = json.load(f)
 
+          # --- Helper: write list[dict] to CSV
           def write_csv(rows, path):
             if not rows:
-              open(path,"w").close(); return
+              open(path,"w",encoding="utf-8").close()
+              return
+            # union of keys across rows keeps schema stable
             keys = sorted({k for r in rows for k in r.keys()})
             with open(path,"w",newline="",encoding="utf-8") as f:
               w = csv.DictWriter(f, fieldnames=keys)
               w.writeheader()
-              for r in rows: w.writerow(r)
+              for r in rows:
+                w.writerow({k:r.get(k) for k in keys})
 
-          write_csv(bs.get("elements", []),     "data/players.csv")
-          write_csv(bs.get("teams", []),        "data/teams.csv")
-          write_csv(bs.get("element_types", []),"data/positions.csv")
+          # --- Tables
+          write_csv(bs.get("elements", []),      "data/players.csv")
+          write_csv(bs.get("teams", []),         "data/teams.csv")
+          write_csv(bs.get("element_types", []), "data/positions.csv")
 
-          # fixtures.json -> fixtures.csv
-          with open("data/fixtures.json","r") as f:
+          # --- Fixtures to CSV
+          with open("data/fixtures.json","r",encoding="utf-8") as f:
             fixtures = json.load(f)
           write_csv(fixtures, "data/fixtures.csv")
           PY
 
-      - name: Show what changed (debug)
+      - name: Derive current GW deadline (UTC & IST) from canonical field
         run: |
-          echo "Repo tree:"
-          ls -la
-          echo "Data folder:"
-          ls -la data || true
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone, timedelta
 
-      - name: Commit changes
+          with open("data/bootstrap_static.json","r",encoding="utf-8") as f:
+            bs = json.load(f)
+
+          # find the current event (authoritative source for deadline)
+          cur = next((e for e in bs.get("events",[]) if e.get("is_current")), None)
+          if not cur or "deadline_time" not in cur:
+            raise SystemExit("ERROR: current event / deadline_time missing in bootstrap_static.json")
+
+          deadline_utc_str = cur["deadline_time"]  # e.g. "2025-08-30T10:00:00Z"
+          dt_utc = datetime.strptime(deadline_utc_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+          dt_ist = dt_utc + timedelta(hours=5, minutes=30)
+
+          os.makedirs("data", exist_ok=True)
+          open("data/deadline_utc.txt","w",encoding="utf-8").write(dt_utc.strftime("%Y-%m-%d %H:%M:%S UTC")+"\n")
+          open("data/deadline_ist.txt","w",encoding="utf-8").write(dt_ist.strftime("%Y-%m-%d %I:%M %p IST")+"\n")
+          PY
+
+      - name: Validate payload (fail fast if something is off)
+        run: |
+          python - <<'PY'
+          import json, sys
+          try:
+            bs = json.load(open("data/bootstrap_static.json","r",encoding="utf-8"))
+            fx = json.load(open("data/fixtures.json","r",encoding="utf-8"))
+          except Exception as e:
+            print("ERROR reading JSON:", e)
+            sys.exit(1)
+
+          cur = [e for e in bs.get("events",[]) if e.get("is_current")]
+          if not cur:
+            print("ERROR: No current event in bootstrap_static.json")
+            sys.exit(1)
+          if "deadline_time" not in cur[0]:
+            print("ERROR: Current event missing deadline_time")
+            sys.exit(1)
+          if not isinstance(fx, list):
+            print("ERROR: fixtures.json not a list")
+            sys.exit(1)
+          print("Validation OK.")
+          PY
+
+      - name: Stamp last updated
+        run: date -u +"%Y-%m-%d %H:%M:%S UTC" > data/last_updated.txt
+
+      - name: Show tree (debug)
+        run: |
+          echo "== repo root =="
+          ls -la
+          echo "== data =="
+          ls -la data || true
+          echo "Deadline IST:"
+          cat data/deadline_ist.txt || true
+
+      - name: Commit changes (if any)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
