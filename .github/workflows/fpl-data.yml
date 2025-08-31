@@ -1,0 +1,41 @@
+name: FPL Data Refresh
+
+on:
+  workflow_dispatch: {}           # allow manual run from the Actions tab
+  schedule:
+    # GitHub Actions uses UTC. IST is UTC+5:30.
+    # 00:00 IST = 18:30 UTC (previous day)
+    # 14:00 IST = 08:30 UTC
+    - cron: "30 18 * * *"        # runs daily at 00:00 IST
+    - cron: "30 8 * * *"         # runs daily at 14:00 IST
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      # === Core FPL endpoints ===
+      - name: Download bootstrap static (players, ownership, ICT, events)
+        run: curl -s https://fantasy.premierleague.com/api/bootstrap-static/ -o bootstrap-static.json
+
+      - name: Download fixtures (JSON)
+        run: curl -s https://fantasy.premierleague.com/api/fixtures/ -o fixtures.json
+
+      # (Optional) If you also want CSVs that match what we already use:
+      # You can keep your existing CSV fetch steps here if you have them,
+      # or convert from JSON to CSV with a tiny Python step later.
+
+      # === Commit changes if files updated ===
+      - name: Commit & push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-update FPL data (bootstrap-static, fixtures)"
+            git push
+          fi
