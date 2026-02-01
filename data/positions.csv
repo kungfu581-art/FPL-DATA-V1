@@ -1,5 +1,5 @@
 element_count,id,plural_name,plural_name_short,singular_name,singular_name_short,squad_max_play,squad_max_select,squad_min_play,squad_min_select,squad_select,sub_positions_locked,ui_shirt_specific
 93,1,Goalkeepers,GKP,Goalkeeper,GKP,1,,1,,2,[12],True
 263,2,Defenders,DEF,Defender,DEF,5,,3,,5,[],False
-362,3,Midfielders,MID,Midfielder,MID,5,,2,,5,[],False
+363,3,Midfielders,MID,Midfielder,MID,5,,2,,5,[],False
 90,4,Forwards,FWD,Forward,FWD,3,,1,,3,[],False
