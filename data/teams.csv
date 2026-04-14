@@ -1,7 +1,7 @@
 code,draw,form,id,loss,name,played,points,position,pulse_id,short_name,strength,strength_attack_away,strength_attack_home,strength_defence_away,strength_defence_home,strength_overall_away,strength_overall_home,team_division,unavailable,win
 3,0,,1,0,Arsenal,0,0,1,1,ARS,5,1390,1340,1340,1270,1365,1305,,False,0
 7,0,,2,0,Aston Villa,0,0,4,2,AVL,3,1230,1100,1210,1180,1220,1140,,False,0
-90,0,,3,0,Burnley,0,0,19,43,BUR,2,1070,930,1090,1040,1080,975,,False,0
+90,0,,3,0,Burnley,0,0,19,43,BUR,2,1070,910,1090,1040,1080,975,,False,0
 91,0,,4,0,Bournemouth,0,0,11,127,BOU,3,1210,1060,1220,1220,1215,1140,,False,0
 94,0,,5,0,Brentford,0,0,7,130,BRE,3,1150,1130,1280,1170,1215,1150,,False,0
 36,0,,6,0,Brighton,0,0,9,131,BHA,3,1200,1140,1260,1180,1230,1160,,False,0
@@ -18,4 +18,4 @@ code,draw,form,id,loss,name,played,points,position,pulse_id,short_name,strength,
 56,0,,17,0,Sunderland,0,0,10,29,SUN,3,1210,1110,1170,1040,1190,1075,,False,0
 6,0,,18,0,Spurs,0,0,18,21,TOT,3,1070,1070,1130,1130,1100,1100,,False,0
 21,0,,19,0,West Ham,0,0,17,25,WHU,3,1070,1050,1130,1130,1100,1090,,False,0
-39,0,,20,0,Wolves,0,0,20,38,WOL,2,1070,1070,1070,1030,1070,1050,,False,0
+39,0,,20,0,Wolves,0,0,20,38,WOL,2,1050,950,1070,1000,1060,975,,False,0
